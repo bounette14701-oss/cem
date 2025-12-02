@@ -7,16 +7,19 @@
     <style>
         /* CSS basé sur votre design (Bleu foncé/Bleu, Rouge/Orange) */
         :root {
-            --couleur-fond: #212121; /* Fond sombre */
-            --couleur-grille: #1a73e8; /* Bleu de la grille */
-            --couleur-texte: #f0f0f0;
-            --couleur-correct: #6aaa64; /* Vert */
-            --couleur-misplaced: #ff9900; /* Orange */
-            --couleur-absent: #cc0000; /* Rouge */
-            --couleur-clavier-default: #444; /* Gris sombre clavier */
-            --taille-case: 45px;
-            --longueur-mot: 8; /* QUIETUDE a 8 lettres */
+            /* Utilisation d'unités VW pour l'adaptabilité */
+            --taille-grille-max: 90vw;
+            --taille-case: 10vw; /* Base de 10% de la largeur de l'écran */
+            --longueur-mot: 8; 
             --max-tentatives: 6;
+
+            --couleur-fond: #212121;
+            --couleur-grille: #1a73e8;
+            --couleur-texte: #f0f0f0;
+            --couleur-correct: #6aaa64;
+            --couleur-misplaced: #ff9900;
+            --couleur-absent: #cc0000;
+            --couleur-clavier-default: #444;
         }
 
         body {
@@ -26,11 +29,14 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 20px;
+            padding: 10px 0;
+            margin: 0;
         }
 
         /* --- En-tête et Messages --- */
         header {
+            width: 95%;
+            max-width: 500px; /* Limite pour les grands écrans */
             text-align: center;
             margin-bottom: 20px;
         }
@@ -38,7 +44,7 @@
             min-height: 20px;
             margin-bottom: 10px;
             font-weight: bold;
-            display: flex; /* Permet d'aligner le carré blanc */
+            display: flex;
             align-items: center;
             justify-content: center;
             gap: 15px;
@@ -48,39 +54,33 @@
         #validation-indicator {
             width: 20px;
             height: 20px;
-            background-color: white; /* Carré blanc */
+            background-color: white;
             border: 2px solid white;
-            opacity: 0; /* Caché par défaut */
+            opacity: 0;
             transition: opacity 0.3s;
         }
-        .indicator-ready {
-            opacity: 1;
-            background-color: var(--couleur-correct);
-        }
-        .indicator-error {
-            opacity: 1;
-            background-color: var(--couleur-absent);
-        }
+        .indicator-ready { opacity: 1; background-color: var(--couleur-correct); }
+        .indicator-error { opacity: 1; background-color: var(--couleur-absent); }
         .message-error { color: var(--couleur-absent); }
         .message-success { color: var(--couleur-correct); }
 
-        /* --- Grille de Jeu --- */
+        /* --- Grille de Jeu (Responsive) --- */
         #grille {
             display: grid;
-            grid-template-columns: repeat(var(--longueur-mot), var(--taille-case));
-            grid-template-rows: repeat(var(--max-tentatives), var(--taille-case));
+            grid-template-columns: repeat(var(--longueur-mot), minmax(35px, var(--taille-case)));
+            grid-template-rows: repeat(var(--max-tentatives), minmax(35px, var(--taille-case)));
             gap: 1px;
             background-color: white;
             border: 1px solid white; 
+            max-width: var(--taille-grille-max);
+            width: 100%;
             margin-bottom: 20px;
         }
         .case {
             display: flex;
             justify-content: center;
             align-items: center;
-            width: var(--taille-case);
-            height: var(--taille-case);
-            font-size: 24px;
+            font-size: 5vw; /* Taille de police adaptable */
             font-weight: bold;
             color: white;
             background-color: var(--couleur-grille);
@@ -88,22 +88,24 @@
             text-transform: uppercase;
         }
 
-        /* --- Clavier AZERTY --- */
+        /* --- Clavier AZERTY (Responsive) --- */
         #clavier {
-            margin-top: 20px;
+            width: 95%;
+            max-width: 500px; /* Aligné avec la grille max */
         }
         .clavier-ligne {
             display: flex;
             justify-content: center;
+            flex-wrap: nowrap; /* Les lignes restent sur une seule ligne */
         }
         .clavier-touche {
             display: flex;
             justify-content: center;
             align-items: center;
-            width: 40px; 
-            height: 45px;
+            flex-grow: 1; /* Distribue l'espace également */
+            height: 40px;
             margin: 3px;
-            font-size: 16px;
+            font-size: 3.5vw; /* Taille de police adaptable */
             font-weight: bold;
             border-radius: 4px;
             text-transform: uppercase;
@@ -114,8 +116,9 @@
             user-select: none;
         }
         .clavier-fonction {
-            width: 60px;
-            font-size: 14px;
+            width: 15%; /* Fonction plus large que les lettres */
+            flex-grow: 0;
+            font-size: 3vw;
         }
 
         /* --- Classes de couleur (s'appliquent aux cases et aux touches) --- */
@@ -123,13 +126,26 @@
         .lettre-misplaced { background-color: var(--couleur-misplaced) !important; border-color: var(--couleur-misplaced) !important; }
         .lettre-absent { background-color: var(--couleur-absent) !important; border-color: var(--couleur-absent) !important; }
         .lettre-default { background-color: var(--couleur-clavier-default) !important; border-color: var(--couleur-clavier-default) !important; }
+
+        /* Media Query pour les grands écrans (maintenir une taille maximale) */
+        @media (min-width: 600px) {
+            :root {
+                --taille-case: 45px; /* Taille fixe pour les grands écrans */
+            }
+            .case, .clavier-touche {
+                font-size: 16px; 
+            }
+            .case {
+                 font-size: 24px;
+            }
+        }
     </style>
 </head>
 <body>
     <div id="contenu">
         <header>
             <h1>🤫 SUTOM - QUIETUDE</h1>
-            <p>Silence, Calme, Sérénité (8 lettres, commence par Q)</p>
+            <p>Mot mystère de 8 lettres. Bonne chance !</p>
         </header>
 
         <div id="message-area">
@@ -160,7 +176,7 @@
 
         let tentatives = [];
         let indexTentative = 0;
-        let indexCase = 0;
+        let indexCase = 0; // Commence à la première case
         let jeuTermine = false;
         let etatClavier = {}; 
 
@@ -183,16 +199,10 @@
                 grille.appendChild(caseElement);
             }
             
-            // Révéler la première lettre
-            const premiereCase = document.getElementById('case-0');
-            premiereCase.textContent = PREMIERE_LETTRE;
-            premiereCase.classList.add('lettre-correct');
-            indexCase = 1; // Commence à la deuxième case
-            
             // Générer le clavier HTML et attacher les écouteurs
             genererClavier();
             
-            setMessage(`Tentative ${indexTentative + 1} : Saisissez votre mot.`, false);
+            setMessage(`Tentative ${indexTentative + 1} / ${MAX_TENTATIVES}. Devinez le mot !`, false);
             updateIndicator();
         }
 
@@ -223,7 +233,6 @@
             const toucheEntree = document.createElement('div');
             toucheEntree.className = 'clavier-touche clavier-fonction';
             toucheEntree.textContent = 'ENTRÉE';
-            // L'entrée est déclenchée automatiquement (evaluerMot), mais on garde la touche pour le clic manuel
             toucheEntree.addEventListener('click', evaluerMot); 
             ligneFonction.appendChild(toucheEntree);
 
@@ -278,14 +287,10 @@
         function saisirLettre(lettre) {
             if (jeuTermine || indexCase >= LONGUEUR_MOT) return;
             
-            // Empêcher l'écrasement de la première lettre
-            if (indexCase === 0) indexCase = 1;
+            const caseElement = getCase(indexTentative, indexCase);
+            caseElement.textContent = lettre;
+            indexCase++;
             
-            if (indexCase < LONGUEUR_MOT) {
-                const caseElement = getCase(indexTentative, indexCase);
-                caseElement.textContent = lettre;
-                indexCase++;
-            }
             // Validation automatique si le mot est complet
             if (indexCase === LONGUEUR_MOT) {
                 updateIndicator(false, true); // Carré vert/prêt
@@ -296,7 +301,7 @@
         }
 
         function effacerLettre() {
-            if (jeuTermine || indexCase <= 1) return; // Ne pas effacer la première lettre
+            if (jeuTermine || indexCase <= 0) return;
             
             indexCase--;
             const caseElement = getCase(indexTentative, indexCase);
@@ -317,13 +322,13 @@
             }
 
             // Vérification de la complétude
-            if (proposition.length !== LONGUEUR_MOT) {
+            if (proposition.length !== LONGUEUR_MOT || proposition.includes(' ')) {
                 setMessage("Le mot n'est pas complet !", true);
-                updateIndicator(true, false); // Carré rouge/erreur
+                updateIndicator(true, false);
                 return;
             }
 
-            // Évaluation complète
+            // --- Logique SUTOM ---
             const evaluation = evaluerPropositionSutom(proposition);
             
             // Mise à jour de la grille et du clavier
@@ -332,7 +337,7 @@
 
             // Mise à jour de l'état du jeu
             indexTentative++;
-            indexCase = 1; 
+            indexCase = 0; // Réinitialise l'index au début de la nouvelle ligne
             tentatives.push(proposition);
 
             if (proposition === MOT_MYSTERE) {
@@ -341,14 +346,8 @@
                 finirJeu(false);
             } else {
                 setMessage(`Tentative ${indexTentative + 1} / ${MAX_TENTATIVES}. Continuez !`, false);
-                // Préparer la première lettre de la prochaine ligne
-                const premiereCaseSuivante = getCase(indexTentative, 0);
-                if (premiereCaseSuivante) {
-                    premiereCaseSuivante.textContent = PREMIERE_LETTRE;
-                    premiereCaseSuivante.classList.add('lettre-correct');
-                }
             }
-            updateIndicator(false, false); // Cacher l'indicateur après l'évaluation
+            updateIndicator(false, false);
         }
 
         function evaluerPropositionSutom(proposition) {
@@ -408,6 +407,13 @@
             
             const restartBtn = document.createElement('button');
             restartBtn.textContent = 'Recommencer';
+            restartBtn.style.padding = '5px 10px';
+            restartBtn.style.marginLeft = '10px';
+            restartBtn.style.cursor = 'pointer';
+            restartBtn.style.backgroundColor = 'var(--couleur-clavier-default)';
+            restartBtn.style.color = 'white';
+            restartBtn.style.border = 'none';
+
             restartBtn.onclick = () => window.location.reload();
             document.getElementById('message-area').appendChild(restartBtn);
         }
@@ -428,7 +434,7 @@
                 // Suppression
                 effacerLettre();
             } else if (touche === 'ENTER' && indexCase === LONGUEUR_MOT) {
-                // Validation manuelle (redondante mais utile)
+                // Évaluation (manuelle, déclenchée si la saisie auto a échoué)
                 evaluerMot();
             }
         });
