@@ -6,22 +6,69 @@ LONGUEUR_MOT = len(MOT_MYSTERE_FIXE)  # Longueur: 8
 PREMIERE_LETTRE = MOT_MYSTERE_FIXE[0]  # Première lettre: Q
 # ---------------------------------------------
 
+# --- Styles CSS pour les cases ---
+# Les classes CSS sont définies pour le Vert, Jaune, Gris
+STYLE_SUTOM = """
+<style>
+    /* Styles généraux des lignes et de la grille */
+    .ligne-sutom {
+        display: flex;
+        justify-content: center;
+        margin: 5px 0;
+    }
+    /* Styles de base pour chaque case (carré) */
+    .case-sutom {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 45px;
+        height: 45px;
+        margin: 3px;
+        border: 2px solid #787c7e; /* Gris par défaut */
+        background-color: #fff; /* Fond blanc par défaut */
+        color: #333;
+        font-size: 24px;
+        font-weight: bold;
+        border-radius: 4px;
+        text-transform: uppercase;
+    }
+    /* Classes de couleur basées sur l'évaluation */
+    .correct {
+        background-color: #6aaa64 !important; /* Vert */
+        border-color: #6aaa64 !important;
+        color: white !important;
+    }
+    .misplaced {
+        background-color: #c9b458 !important; /* Jaune */
+        border-color: #c9b458 !important;
+        color: white !important;
+    }
+    .absent {
+        background-color: #787c7e !important; /* Gris foncé */
+        border-color: #787c7e !important;
+        color: white !important;
+    }
+</style>
+"""
+
+# Injection du style au début de l'application
+st.markdown(STYLE_SUTOM, unsafe_allow_html=True)
+
+
 def evaluer_proposition_sutom(mot_mystere, proposition):
     """
     Évalue la proposition selon les règles de couleur du SUTOM.
-    Retourne une liste de tuples (lettre, couleur_css).
+    Retourne une liste de tuples (lettre, classe_css).
     """
     mot_mystere = mot_mystere.upper()
     proposition = proposition.upper()
     
-    # Vérification de la longueur pour la sécurité
     if len(proposition) != len(mot_mystere):
-        return [(l, "#787c7e") for l in proposition]
+        return [(l, "absent") for l in proposition]
 
     mot_mystere_list = list(mot_mystere)
     proposition_list = list(proposition)
     
-    # Étape 1 : Compter les occurrences de lettres dans le mot mystère
     comptage_mystere = {}
     for lettre in mot_mystere:
         comptage_mystere[lettre] = comptage_mystere.get(lettre, 0) + 1
@@ -31,49 +78,38 @@ def evaluer_proposition_sutom(mot_mystere, proposition):
     # Phase 1 : Marquage du Vert (lettre bien placée)
     for i in range(LONGUEUR_MOT):
         if proposition_list[i] == mot_mystere_list[i]:
-            evaluation[i] = (proposition_list[i], "#6aaa64")  # Vert
+            evaluation[i] = (proposition_list[i], "correct")
             comptage_mystere[proposition_list[i]] -= 1
         else:
-            evaluation[i] = (proposition_list[i], "#787c7e")  # Gris (Temporaire)
+            evaluation[i] = (proposition_list[i], "absent") # Temporaire
 
-    # Phase 2 : Marquage du Jaune (lettre présente, mauvaise position) et du Gris final
+    # Phase 2 : Marquage du Jaune (mal placée) et du Gris final (absente)
     for i in range(LONGUEUR_MOT):
-        if evaluation[i][1] == "#787c7e":  # Si ce n'est pas Vert
+        if evaluation[i][1] == "absent":  # Si ce n'est pas Vert
             lettre = proposition_list[i]
             if lettre in comptage_mystere and comptage_mystere[lettre] > 0:
-                evaluation[i] = (lettre, "#c9b458")  # Jaune
+                evaluation[i] = (lettre, "misplaced")  # Jaune
                 comptage_mystere[lettre] -= 1
             else:
-                evaluation[i] = (lettre, "#787c7e")  # Gris
+                evaluation[i] = (lettre, "absent") # Gris
 
     return evaluation
 
 def afficher_grille_sutom(evaluation):
     """
-    Affiche une ligne de la grille SUTOM avec des couleurs de fond en HTML/CSS.
+    Affiche une ligne de la grille SUTOM en utilisant les classes CSS.
     """
     html_content = ""
-    # Taille de case standard pour 8 lettres
-    taille_case = "45px"
     
-    for lettre, couleur in evaluation:
+    for lettre, classe_css in evaluation:
+        # Utilisation de la classe CSS pour la couleur et le style
         html_content += f"""
-        <div style="
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            width: {taille_case};
-            height: {taille_case};
-            margin: 2px;
-            border: 2px solid {couleur};
-            background-color: {couleur};
-            color: white;
-            font-size: 20px;
-            font-weight: bold;
-            border-radius: 4px;
-        ">{lettre}</div>
+        <div class="case-sutom {classe_css}">
+            {lettre}
+        </div>
         """
-    st.markdown(f'<div style="display: flex; justify-content: center; margin: 10px 0;">{html_content}</div>', unsafe_allow_html=True)
+    # Utilisation de la ligne CSS pour centrer et organiser
+    st.markdown(f'<div class="ligne-sutom">{html_content}</div>', unsafe_allow_html=True)
 
 
 # --- Fonction de rappel pour la soumission ---
@@ -125,9 +161,19 @@ if st.session_state.historique_propositions:
     for evaluation in st.session_state.historique_propositions:
         afficher_grille_sutom(evaluation)
 else:
-    # Afficher la première ligne avec la première lettre révélée
-    premiere_ligne = [(PREMIERE_LETTRE, "#6aaa64")] + [(" ", "#787c7e")] * (LONGUEUR_MOT - 1)
-    afficher_grille_sutom(premiere_ligne)
+    # Afficher la première ligne avec la première lettre révélée (stylisée)
+    premiere_ligne = [(PREMIERE_LETTRE, "correct")] + [(" ", "case-sutom")] * (LONGUEUR_MOT - 1)
+    # L'affichage de la première ligne non encore jouée doit utiliser une classe "case-sutom" générique
+    html_content = ""
+    for lettre, classe in premiere_ligne:
+        # Si c'est la première lettre, on lui donne la classe "correct"
+        if lettre == PREMIERE_LETTRE:
+             html_content += f'<div class="case-sutom correct">{lettre}</div>'
+        # Sinon, c'est une case vide non colorée par défaut
+        else:
+             html_content += f'<div class="case-sutom"> </div>'
+    st.markdown(f'<div class="ligne-sutom">{html_content}</div>', unsafe_allow_html=True)
+
 
 # --- Formulaire de Jeu ---
 if not st.session_state.trouve:
