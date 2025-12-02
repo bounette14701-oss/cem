@@ -38,6 +38,28 @@
             min-height: 20px;
             margin-bottom: 10px;
             font-weight: bold;
+            display: flex; /* Permet d'aligner le carré blanc */
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        /* --- Le Carré Blanc d'Indication --- */
+        #validation-indicator {
+            width: 20px;
+            height: 20px;
+            background-color: white; /* Carré blanc */
+            border: 2px solid white;
+            opacity: 0; /* Caché par défaut */
+            transition: opacity 0.3s;
+        }
+        .indicator-ready {
+            opacity: 1;
+            background-color: var(--couleur-correct);
+        }
+        .indicator-error {
+            opacity: 1;
+            background-color: var(--couleur-absent);
         }
         .message-error { color: var(--couleur-absent); }
         .message-success { color: var(--couleur-correct); }
@@ -47,8 +69,8 @@
             display: grid;
             grid-template-columns: repeat(var(--longueur-mot), var(--taille-case));
             grid-template-rows: repeat(var(--max-tentatives), var(--taille-case));
-            gap: 1px; /* Lignes blanches simulées */
-            background-color: white; /* Fond blanc pour simuler la ligne entre les cases */
+            gap: 1px;
+            background-color: white;
             border: 1px solid white; 
             margin-bottom: 20px;
         }
@@ -107,10 +129,13 @@
     <div id="contenu">
         <header>
             <h1>🤫 SUTOM - QUIETUDE</h1>
-            <p>Silence, Calme, Sérénité (9 lettres, commence par Q)</p>
+            <p>Silence, Calme, Sérénité (8 lettres, commence par Q)</p>
         </header>
 
-        <div id="message-area"></div>
+        <div id="message-area">
+            <div id="validation-indicator"></div>
+            <div id="notification-text"></div>
+        </div>
         
         <div id="grille">
             </div>
@@ -121,10 +146,10 @@
     </div>
 
     <script>
-        // --- 2. Configuration et État du Jeu ---
+        // --- Configuration et État du Jeu ---
         const MOT_MYSTERE = "QUIETUDE"; // 8 lettres sans accent
-        const LONGUEUR_MOT = MOT_MYSTERE.length;
-        const PREMIERE_LETTRE = MOT_MYSTERE[0];
+        const LONGUEUR_MOT = MOT_MYSTERE.length; // 8
+        const PREMIERE_LETTRE = MOT_MYSTERE[0]; // Q
         const MAX_TENTATIVES = 6;
         
         const CLAVIER_LAYOUT = [
@@ -137,7 +162,7 @@
         let indexTentative = 0;
         let indexCase = 0;
         let jeuTermine = false;
-        let etatClavier = {}; // État pour les couleurs du clavier
+        let etatClavier = {}; 
 
         // --- 3. Fonctions d'Initialisation et d'Affichage ---
 
@@ -162,11 +187,13 @@
             const premiereCase = document.getElementById('case-0');
             premiereCase.textContent = PREMIERE_LETTRE;
             premiereCase.classList.add('lettre-correct');
-
+            indexCase = 1; // Commence à la deuxième case
+            
             // Générer le clavier HTML et attacher les écouteurs
             genererClavier();
             
-            setMessage(`Commencez par le mot de ${LONGUEUR_MOT} lettres !`, false);
+            setMessage(`Tentative ${indexTentative + 1} : Saisissez votre mot.`, false);
+            updateIndicator();
         }
 
         function genererClavier() {
@@ -196,7 +223,8 @@
             const toucheEntree = document.createElement('div');
             toucheEntree.className = 'clavier-touche clavier-fonction';
             toucheEntree.textContent = 'ENTRÉE';
-            toucheEntree.addEventListener('click', evaluerMot);
+            // L'entrée est déclenchée automatiquement (evaluerMot), mais on garde la touche pour le clic manuel
+            toucheEntree.addEventListener('click', evaluerMot); 
             ligneFonction.appendChild(toucheEntree);
 
             // Touche Supprimer
@@ -214,7 +242,6 @@
                 ligne.split('').forEach(lettre => {
                     const touche = document.getElementById(`touche-${lettre}`);
                     if (touche) {
-                        // Supprimer les anciennes classes de couleur et ajouter la nouvelle
                         touche.classList.remove('lettre-correct', 'lettre-misplaced', 'lettre-absent', 'lettre-default');
                         touche.classList.add(`lettre-${etatClavier[lettre]}`);
                     }
@@ -223,15 +250,29 @@
         }
 
         function setMessage(texte, isError) {
-            const msgArea = document.getElementById('message-area');
-            msgArea.textContent = texte;
-            msgArea.className = isError ? 'message-error' : 'message-success';
+            const msgText = document.getElementById('notification-text');
+            msgText.textContent = texte;
+            msgText.className = isError ? 'message-error' : 'message-success';
+        }
+        
+        function updateIndicator(isError = false, isReady = false) {
+            const indicator = document.getElementById('validation-indicator');
+            indicator.classList.remove('indicator-ready', 'indicator-error');
+            indicator.style.opacity = '0';
+            
+            if (isReady) {
+                indicator.classList.add('indicator-ready');
+                indicator.style.opacity = '1';
+            } else if (isError) {
+                indicator.classList.add('indicator-error');
+                indicator.style.opacity = '1';
+            }
         }
 
         // --- 4. Logique de Saisie et d'Effacement ---
 
-        function getCaseActuelle() {
-            return document.getElementById(`case-${indexTentative * LONGUEUR_MOT + indexCase}`);
+        function getCase(tentative, index) {
+            return document.getElementById(`case-${tentative * LONGUEUR_MOT + index}`);
         }
 
         function saisirLettre(lettre) {
@@ -241,9 +282,16 @@
             if (indexCase === 0) indexCase = 1;
             
             if (indexCase < LONGUEUR_MOT) {
-                const caseElement = getCaseActuelle();
+                const caseElement = getCase(indexTentative, indexCase);
                 caseElement.textContent = lettre;
                 indexCase++;
+            }
+            // Validation automatique si le mot est complet
+            if (indexCase === LONGUEUR_MOT) {
+                updateIndicator(false, true); // Carré vert/prêt
+                evaluerMot();
+            } else {
+                updateIndicator(false, false);
             }
         }
 
@@ -251,8 +299,10 @@
             if (jeuTermine || indexCase <= 1) return; // Ne pas effacer la première lettre
             
             indexCase--;
-            const caseElement = getCaseActuelle();
+            const caseElement = getCase(indexTentative, indexCase);
             caseElement.textContent = '';
+            
+            updateIndicator(false, false);
         }
         
         // --- 5. Logique d'Évaluation SUTOM ---
@@ -266,18 +316,14 @@
                 proposition += document.getElementById(`case-${debutLigne + i}`).textContent;
             }
 
+            // Vérification de la complétude
             if (proposition.length !== LONGUEUR_MOT) {
                 setMessage("Le mot n'est pas complet !", true);
+                updateIndicator(true, false); // Carré rouge/erreur
                 return;
             }
 
-            // Vérification de la première lettre (déjà garantie par le jeu, mais pour la sécurité)
-            if (proposition[0] !== PREMIERE_LETTRE) {
-                setMessage(`Le mot doit commencer par '${PREMIERE_LETTRE}' !`, true);
-                return;
-            }
-
-            // Évaluation complète (logique double passe)
+            // Évaluation complète
             const evaluation = evaluerPropositionSutom(proposition);
             
             // Mise à jour de la grille et du clavier
@@ -286,7 +332,7 @@
 
             // Mise à jour de l'état du jeu
             indexTentative++;
-            indexCase = 1; // Commence à la deuxième case pour la prochaine tentative
+            indexCase = 1; 
             tentatives.push(proposition);
 
             if (proposition === MOT_MYSTERE) {
@@ -296,12 +342,13 @@
             } else {
                 setMessage(`Tentative ${indexTentative + 1} / ${MAX_TENTATIVES}. Continuez !`, false);
                 // Préparer la première lettre de la prochaine ligne
-                const premiereCaseSuivante = document.getElementById(`case-${indexTentative * LONGUEUR_MOT}`);
+                const premiereCaseSuivante = getCase(indexTentative, 0);
                 if (premiereCaseSuivante) {
                     premiereCaseSuivante.textContent = PREMIERE_LETTRE;
                     premiereCaseSuivante.classList.add('lettre-correct');
                 }
             }
+            updateIndicator(false, false); // Cacher l'indicateur après l'évaluation
         }
 
         function evaluerPropositionSutom(proposition) {
@@ -354,12 +401,11 @@
         function finirJeu(victoire) {
             jeuTermine = true;
             if (victoire) {
-                setMessage(`🥳 Victoire ! Vous avez trouvé '${MOT_MYSTERE}' !`, false);
+                setMessage(`🥳 Victoire ! Vous avez trouvé '${MOT_MYSTERE}' en ${tentatives.length} tentatives !`, false);
             } else {
                 setMessage(`😭 Défaite ! Le mot était '${MOT_MYSTERE}'.`, true);
             }
             
-            // Ajouter un bouton de redémarrage (invisible si Streamlit est utilisé, mais utile ici)
             const restartBtn = document.createElement('button');
             restartBtn.textContent = 'Recommencer';
             restartBtn.onclick = () => window.location.reload();
@@ -381,8 +427,8 @@
             } else if (touche === 'BACKSPACE' || touche === 'DELETE') {
                 // Suppression
                 effacerLettre();
-            } else if (touche === 'ENTER') {
-                // Évaluation
+            } else if (touche === 'ENTER' && indexCase === LONGUEUR_MOT) {
+                // Validation manuelle (redondante mais utile)
                 evaluerMot();
             }
         });
