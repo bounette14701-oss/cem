@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUTOM - QUIETUDE</title>
+    <style>
+        /* CSS basé sur votre design (Bleu foncé/Bleu, Rouge/Orange) */
+        :root {
+            --couleur-fond: #212121; /* Fond sombre */
+            --couleur-grille: #1a73e8; /* Bleu de la grille */
+            --couleur-texte: #f0f0f0;
+            --couleur-correct: #6aaa64; /* Vert */
+            --couleur-misplaced: #ff9900; /* Orange */
+            --couleur-absent: #cc0000; /* Rouge */
+            --couleur-clavier-default: #444; /* Gris sombre clavier */
+            --taille-case: 45px;
+            --longueur-mot: 8; /* QUIETUDE a 8 lettres */
+            --max-tentatives: 6;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--couleur-fond);
+            color: var(--couleur-texte);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* --- En-tête et Messages --- */
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #message-area {
+            min-height: 20px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .message-error { color: var(--couleur-absent); }
+        .message-success { color: var(--couleur-correct); }
+
+        /* --- Grille de Jeu --- */
+        #grille {
+            display: grid;
+            grid-template-columns: repeat(var(--longueur-mot), var(--taille-case));
+            grid-template-rows: repeat(var(--max-tentatives), var(--taille-case));
+            gap: 1px; /* Lignes blanches simulées */
+            background-color: white; /* Fond blanc pour simuler la ligne entre les cases */
+            border: 1px solid white; 
+            margin-bottom: 20px;
+        }
+        .case {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: var(--taille-case);
+            height: var(--taille-case);
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            background-color: var(--couleur-grille);
+            border: none;
+            text-transform: uppercase;
+        }
+
+        /* --- Clavier AZERTY --- */
+        #clavier {
+            margin-top: 20px;
+        }
+        .clavier-ligne {
+            display: flex;
+            justify-content: center;
+        }
+        .clavier-touche {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 40px; 
+            height: 45px;
+            margin: 3px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 4px;
+            text-transform: uppercase;
+            border: 2px solid var(--couleur-clavier-default);
+            background-color: var(--couleur-clavier-default);
+            color: var(--couleur-texte);
+            cursor: pointer;
+            user-select: none;
+        }
+        .clavier-fonction {
+            width: 60px;
+            font-size: 14px;
+        }
+
+        /* --- Classes de couleur (s'appliquent aux cases et aux touches) --- */
+        .lettre-correct { background-color: var(--couleur-correct) !important; border-color: var(--couleur-correct) !important; }
+        .lettre-misplaced { background-color: var(--couleur-misplaced) !important; border-color: var(--couleur-misplaced) !important; }
+        .lettre-absent { background-color: var(--couleur-absent) !important; border-color: var(--couleur-absent) !important; }
+        .lettre-default { background-color: var(--couleur-clavier-default) !important; border-color: var(--couleur-clavier-default) !important; }
+    </style>
+</head>
+<body>
+    <div id="contenu">
+        <header>
+            <h1>🤫 SUTOM - QUIETUDE</h1>
+            <p>Silence, Calme, Sérénité (9 lettres, commence par Q)</p>
+        </header>
+
+        <div id="message-area"></div>
+        
+        <div id="grille">
+            </div>
+
+        <div id="clavier">
+            </div>
+
+    </div>
+
+    <script>
+        // --- 2. Configuration et État du Jeu ---
+        const MOT_MYSTERE = "QUIETUDE"; // 8 lettres sans accent
+        const LONGUEUR_MOT = MOT_MYSTERE.length;
+        const PREMIERE_LETTRE = MOT_MYSTERE[0];
+        const MAX_TENTATIVES = 6;
+        
+        const CLAVIER_LAYOUT = [
+            "AZERTYUIOP",
+            "QSDFGHJKLM",
+            "WXCVBN"
+        ];
+
+        let tentatives = [];
+        let indexTentative = 0;
+        let indexCase = 0;
+        let jeuTermine = false;
+        let etatClavier = {}; // État pour les couleurs du clavier
+
+        // --- 3. Fonctions d'Initialisation et d'Affichage ---
+
+        function initJeu() {
+            // Initialiser l'état du clavier
+            for (let i = 0; i < 26; i++) {
+                etatClavier[String.fromCharCode(65 + i)] = 'default';
+            }
+
+            // Générer la grille HTML
+            const grille = document.getElementById('grille');
+            grille.style.setProperty('--longueur-mot', LONGUEUR_MOT);
+            
+            for (let i = 0; i < MAX_TENTATIVES * LONGUEUR_MOT; i++) {
+                const caseElement = document.createElement('div');
+                caseElement.className = 'case';
+                caseElement.id = `case-${i}`;
+                grille.appendChild(caseElement);
+            }
+            
+            // Révéler la première lettre
+            const premiereCase = document.getElementById('case-0');
+            premiereCase.textContent = PREMIERE_LETTRE;
+            premiereCase.classList.add('lettre-correct');
+
+            // Générer le clavier HTML et attacher les écouteurs
+            genererClavier();
+            
+            setMessage(`Commencez par le mot de ${LONGUEUR_MOT} lettres !`, false);
+        }
+
+        function genererClavier() {
+            const clavierElement = document.getElementById('clavier');
+            clavierElement.innerHTML = '';
+
+            CLAVIER_LAYOUT.forEach(ligne => {
+                const ligneDiv = document.createElement('div');
+                ligneDiv.className = 'clavier-ligne';
+                
+                ligne.split('').forEach(lettre => {
+                    const touche = document.createElement('div');
+                    touche.className = `clavier-touche lettre-${etatClavier[lettre]}`;
+                    touche.textContent = lettre;
+                    touche.id = `touche-${lettre}`;
+                    touche.addEventListener('click', () => saisirLettre(lettre));
+                    ligneDiv.appendChild(touche);
+                });
+                clavierElement.appendChild(ligneDiv);
+            });
+            
+            // Ajouter les touches de fonction
+            const ligneFonction = document.createElement('div');
+            ligneFonction.className = 'clavier-ligne';
+
+            // Touche Entrée
+            const toucheEntree = document.createElement('div');
+            toucheEntree.className = 'clavier-touche clavier-fonction';
+            toucheEntree.textContent = 'ENTRÉE';
+            toucheEntree.addEventListener('click', evaluerMot);
+            ligneFonction.appendChild(toucheEntree);
+
+            // Touche Supprimer
+            const toucheSuppr = document.createElement('div');
+            toucheSuppr.className = 'clavier-touche clavier-fonction';
+            toucheSuppr.textContent = 'SUPPR';
+            toucheSuppr.addEventListener('click', effacerLettre);
+            ligneFonction.appendChild(toucheSuppr);
+            
+            clavierElement.appendChild(ligneFonction);
+        }
+        
+        function updateClavier() {
+            CLAVIER_LAYOUT.forEach(ligne => {
+                ligne.split('').forEach(lettre => {
+                    const touche = document.getElementById(`touche-${lettre}`);
+                    if (touche) {
+                        // Supprimer les anciennes classes de couleur et ajouter la nouvelle
+                        touche.classList.remove('lettre-correct', 'lettre-misplaced', 'lettre-absent', 'lettre-default');
+                        touche.classList.add(`lettre-${etatClavier[lettre]}`);
+                    }
+                });
+            });
+        }
+
+        function setMessage(texte, isError) {
+            const msgArea = document.getElementById('message-area');
+            msgArea.textContent = texte;
+            msgArea.className = isError ? 'message-error' : 'message-success';
+        }
+
+        // --- 4. Logique de Saisie et d'Effacement ---
+
+        function getCaseActuelle() {
+            return document.getElementById(`case-${indexTentative * LONGUEUR_MOT + indexCase}`);
+        }
+
+        function saisirLettre(lettre) {
+            if (jeuTermine || indexCase >= LONGUEUR_MOT) return;
+            
+            // Empêcher l'écrasement de la première lettre
+            if (indexCase === 0) indexCase = 1;
+            
+            if (indexCase < LONGUEUR_MOT) {
+                const caseElement = getCaseActuelle();
+                caseElement.textContent = lettre;
+                indexCase++;
+            }
+        }
+
+        function effacerLettre() {
+            if (jeuTermine || indexCase <= 1) return; // Ne pas effacer la première lettre
+            
+            indexCase--;
+            const caseElement = getCaseActuelle();
+            caseElement.textContent = '';
+        }
+        
+        // --- 5. Logique d'Évaluation SUTOM ---
+        
+        function evaluerMot() {
+            if (jeuTermine) return;
+            
+            let proposition = '';
+            const debutLigne = indexTentative * LONGUEUR_MOT;
+            for (let i = 0; i < LONGUEUR_MOT; i++) {
+                proposition += document.getElementById(`case-${debutLigne + i}`).textContent;
+            }
+
+            if (proposition.length !== LONGUEUR_MOT) {
+                setMessage("Le mot n'est pas complet !", true);
+                return;
+            }
+
+            // Vérification de la première lettre (déjà garantie par le jeu, mais pour la sécurité)
+            if (proposition[0] !== PREMIERE_LETTRE) {
+                setMessage(`Le mot doit commencer par '${PREMIERE_LETTRE}' !`, true);
+                return;
+            }
+
+            // Évaluation complète (logique double passe)
+            const evaluation = evaluerPropositionSutom(proposition);
+            
+            // Mise à jour de la grille et du clavier
+            appliquerEvaluation(evaluation, debutLigne);
+            updateClavier();
+
+            // Mise à jour de l'état du jeu
+            indexTentative++;
+            indexCase = 1; // Commence à la deuxième case pour la prochaine tentative
+            tentatives.push(proposition);
+
+            if (proposition === MOT_MYSTERE) {
+                finirJeu(true);
+            } else if (indexTentative >= MAX_TENTATIVES) {
+                finirJeu(false);
+            } else {
+                setMessage(`Tentative ${indexTentative + 1} / ${MAX_TENTATIVES}. Continuez !`, false);
+                // Préparer la première lettre de la prochaine ligne
+                const premiereCaseSuivante = document.getElementById(`case-${indexTentative * LONGUEUR_MOT}`);
+                if (premiereCaseSuivante) {
+                    premiereCaseSuivante.textContent = PREMIERE_LETTRE;
+                    premiereCaseSuivante.classList.add('lettre-correct');
+                }
+            }
+        }
+
+        function evaluerPropositionSutom(proposition) {
+            const motMystereList = MOT_MYSTERE.split('');
+            const propositionList = proposition.split('');
+            const resultat = Array(LONGUEUR_MOT).fill(null);
+            
+            const comptageMystere = {};
+            for (const lettre of MOT_MYSTERE) {
+                comptageMystere[lettre] = (comptageMystere[lettre] || 0) + 1;
+            }
+
+            // Phase 1 : Vert
+            for (let i = 0; i < LONGUEUR_MOT; i++) {
+                if (propositionList[i] === motMystereList[i]) {
+                    resultat[i] = 'correct';
+                    comptageMystere[propositionList[i]]--;
+                    etatClavier[propositionList[i]] = 'correct';
+                }
+            }
+
+            // Phase 2 : Orange et Rouge
+            for (let i = 0; i < LONGUEUR_MOT; i++) {
+                if (resultat[i] === null) {
+                    const lettre = propositionList[i];
+                    if (comptageMystere[lettre] > 0) {
+                        resultat[i] = 'misplaced'; // Orange
+                        comptageMystere[lettre]--;
+                        if (etatClavier[lettre] !== 'correct') {
+                            etatClavier[lettre] = 'misplaced';
+                        }
+                    } else {
+                        resultat[i] = 'absent'; // Rouge
+                        if (etatClavier[lettre] !== 'correct' && etatClavier[lettre] !== 'misplaced') {
+                            etatClavier[lettre] = 'absent';
+                        }
+                    }
+                }
+            }
+            return resultat;
+        }
+
+        function appliquerEvaluation(evaluation, debutLigne) {
+            for (let i = 0; i < LONGUEUR_MOT; i++) {
+                const caseElement = document.getElementById(`case-${debutLigne + i}`);
+                caseElement.classList.add(`lettre-${evaluation[i]}`);
+            }
+        }
+
+        function finirJeu(victoire) {
+            jeuTermine = true;
+            if (victoire) {
+                setMessage(`🥳 Victoire ! Vous avez trouvé '${MOT_MYSTERE}' !`, false);
+            } else {
+                setMessage(`😭 Défaite ! Le mot était '${MOT_MYSTERE}'.`, true);
+            }
+            
+            // Ajouter un bouton de redémarrage (invisible si Streamlit est utilisé, mais utile ici)
+            const restartBtn = document.createElement('button');
+            restartBtn.textContent = 'Recommencer';
+            restartBtn.onclick = () => window.location.reload();
+            document.getElementById('message-area').appendChild(restartBtn);
+        }
+
+        // --- Démarrage du Jeu (Exécuté au chargement) ---
+        window.onload = initJeu;
+        
+        // Gérer les frappes au clavier physique (pour les ordinateurs)
+        document.addEventListener('keyup', (e) => {
+            if (jeuTermine) return;
+
+            const touche = e.key.toUpperCase();
+            
+            if (touche.length === 1 && /[A-Z]/.test(touche)) {
+                // Saisie de lettres
+                saisirLettre(touche);
+            } else if (touche === 'BACKSPACE' || touche === 'DELETE') {
+                // Suppression
+                effacerLettre();
+            } else if (touche === 'ENTER') {
+                // Évaluation
+                evaluerMot();
+            }
+        });
+    </script>
+</body>
+</html>
