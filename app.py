@@ -1,122 +1,136 @@
 import streamlit as st
 
-# --- Le mot mystère est maintenant fixé ici ---
+# --- Configuration du Jeu ---
 MOT_MYSTERE_FIXE = "QUIETUDE"
 LONGUEUR_MOT = len(MOT_MYSTERE_FIXE)  # Longueur: 8
 PREMIERE_LETTRE = MOT_MYSTERE_FIXE[0]  # Première lettre: Q
-# ---------------------------------------------
 
-# --- Styles CSS pour les cases ---
-# Les classes CSS sont définies pour le Vert, Jaune, Gris
+# Liste des lettres du clavier pour l'affichage
+CLAVIER_LAYOUT = [
+    "AZERTYUIOP",
+    "QSDFGHJKLM",
+    "WXCVBN"
+]
+
+# --- Initialisation de l'état de session ---
+if 'historique_propositions' not in st.session_state:
+    st.session_state.historique_propositions = []
+if 'trouve' not in st.session_state:
+    st.session_state.trouve = False
+if 'message_erreur' not in st.session_state:
+    st.session_state.message_erreur = ""
+# État du clavier : {'A': 'default', 'B': 'absent', 'C': 'correct', ...}
+if 'etat_clavier' not in st.session_state:
+    st.session_state.etat_clavier = {chr(i): 'default' for i in range(ord('A'), ord('Z') + 1)}
+
+# --- Styles CSS pour l'interface (Inclus Clavier) ---
 STYLE_SUTOM = """
 <style>
-    /* Styles généraux des lignes et de la grille */
-    .ligne-sutom {
+    /* Styles de base pour les cases de la grille */
+    .ligne-sutom, .clavier-ligne {
         display: flex;
         justify-content: center;
         margin: 5px 0;
     }
-    /* Styles de base pour chaque case (carré) */
-    .case-sutom {
+    .case-sutom, .clavier-touche {
         display: inline-flex;
         justify-content: center;
         align-items: center;
-        width: 45px;
-        height: 45px;
-        margin: 3px;
-        border: 2px solid #787c7e; /* Gris par défaut */
-        background-color: #fff; /* Fond blanc par défaut */
-        color: #333;
-        font-size: 24px;
+        margin: 2px;
         font-weight: bold;
         border-radius: 4px;
         text-transform: uppercase;
+        transition: background-color 0.3s;
     }
-    /* Classes de couleur basées sur l'évaluation */
-    .correct {
-        background-color: #6aaa64 !important; /* Vert */
-        border-color: #6aaa64 !important;
-        color: white !important;
+    .case-sutom {
+        width: 45px;
+        height: 45px;
+        font-size: 24px;
+        border: 2px solid #787c7e;
+        background-color: #fff;
+        color: #333;
     }
-    .misplaced {
-        background-color: #c9b458 !important; /* Jaune */
-        border-color: #c9b458 !important;
-        color: white !important;
+    .clavier-touche {
+        width: 32px; /* Taille plus petite pour le clavier */
+        height: 40px;
+        font-size: 14px;
+        background-color: #d3d6da; /* Gris clair par défaut */
+        color: #333;
+        border: none;
+        cursor: default;
     }
-    .absent {
-        background-color: #787c7e !important; /* Gris foncé */
-        border-color: #787c7e !important;
-        color: white !important;
-    }
+    /* Classes de couleur */
+    .correct { background-color: #6aaa64 !important; border-color: #6aaa64 !important; color: white !important; }
+    .misplaced { background-color: #c9b458 !important; border-color: #c9b458 !important; color: white !important; }
+    .absent { background-color: #787c7e !important; border-color: #787c7e !important; color: white !important; }
+    .default { background-color: #d3d6da !important; color: #333 !important; }
 </style>
 """
-
-# Injection du style au début de l'application
 st.markdown(STYLE_SUTOM, unsafe_allow_html=True)
 
 
+# --- Fonctions d'évaluation et d'affichage ---
+
 def evaluer_proposition_sutom(mot_mystere, proposition):
     """
-    Évalue la proposition selon les règles de couleur du SUTOM.
-    Retourne une liste de tuples (lettre, classe_css).
+    Évalue la proposition et met à jour l'état du clavier.
     """
     mot_mystere = mot_mystere.upper()
     proposition = proposition.upper()
-    
-    if len(proposition) != len(mot_mystere):
-        return [(l, "absent") for l in proposition]
-
     mot_mystere_list = list(mot_mystere)
     proposition_list = list(proposition)
     
-    comptage_mystere = {}
-    for lettre in mot_mystere:
-        comptage_mystere[lettre] = comptage_mystere.get(lettre, 0) + 1
-        
+    comptage_mystere = {lettre: mot_mystere.count(lettre) for lettre in mot_mystere}
     evaluation = [None] * LONGUEUR_MOT
     
-    # Phase 1 : Marquage du Vert (lettre bien placée)
+    # 1. Marquage du Vert (correct)
     for i in range(LONGUEUR_MOT):
         if proposition_list[i] == mot_mystere_list[i]:
             evaluation[i] = (proposition_list[i], "correct")
             comptage_mystere[proposition_list[i]] -= 1
+            # Mise à jour du clavier : le vert est prioritaire
+            st.session_state.etat_clavier[proposition_list[i]] = 'correct'
         else:
             evaluation[i] = (proposition_list[i], "absent") # Temporaire
 
-    # Phase 2 : Marquage du Jaune (mal placée) et du Gris final (absente)
+    # 2. Marquage du Jaune (misplaced) ou Gris (absent)
     for i in range(LONGUEUR_MOT):
-        if evaluation[i][1] == "absent":  # Si ce n'est pas Vert
-            lettre = proposition_list[i]
-            if lettre in comptage_mystere and comptage_mystere[lettre] > 0:
-                evaluation[i] = (lettre, "misplaced")  # Jaune
+        lettre = proposition_list[i]
+        if evaluation[i][1] == "absent":  # Si pas encore Vert
+            if comptage_mystere.get(lettre, 0) > 0:
+                evaluation[i] = (lettre, "misplaced")
                 comptage_mystere[lettre] -= 1
+                # Mise à jour du clavier : Jaune si pas déjà Vert
+                if st.session_state.etat_clavier[lettre] != 'correct':
+                    st.session_state.etat_clavier[lettre] = 'misplaced'
             else:
-                evaluation[i] = (lettre, "absent") # Gris
+                evaluation[i] = (lettre, "absent")
+                # Mise à jour du clavier : Gris si pas déjà Vert ou Jaune
+                if st.session_state.etat_clavier[lettre] not in ['correct', 'misplaced']:
+                    st.session_state.etat_clavier[lettre] = 'absent'
 
     return evaluation
 
 def afficher_grille_sutom(evaluation):
-    """
-    Affiche une ligne de la grille SUTOM en utilisant les classes CSS.
-    """
+    """Affiche une ligne de la grille en utilisant les classes CSS."""
     html_content = ""
-    
     for lettre, classe_css in evaluation:
-        # Utilisation de la classe CSS pour la couleur et le style
-        html_content += f"""
-        <div class="case-sutom {classe_css}">
-            {lettre}
-        </div>
-        """
-    # Utilisation de la ligne CSS pour centrer et organiser
+        html_content += f'<div class="case-sutom {classe_css}">{lettre}</div>'
     st.markdown(f'<div class="ligne-sutom">{html_content}</div>', unsafe_allow_html=True)
 
+def afficher_clavier():
+    """Affiche le clavier virtuel avec les couleurs de l'état."""
+    for ligne in CLAVIER_LAYOUT:
+        html_content = ""
+        for lettre in ligne:
+            # Récupère l'état de la lettre (default, correct, misplaced, absent)
+            classe = st.session_state.etat_clavier.get(lettre, 'default')
+            html_content += f'<div class="clavier-touche {classe}">{lettre}</div>'
+        st.markdown(f'<div class="clavier-ligne">{html_content}</div>', unsafe_allow_html=True)
 
-# --- Fonction de rappel pour la soumission ---
+# --- Logique de Soumission ---
 def gerer_proposition_soumise(proposition_utilisateur):
-    """
-    Traite la proposition et l'ajoute à l'historique.
-    """
+    """Traite la proposition et met à jour l'état du jeu."""
     proposition_utilisateur = proposition_utilisateur.strip().upper()
 
     if not proposition_utilisateur or len(proposition_utilisateur) != LONGUEUR_MOT:
@@ -130,52 +144,46 @@ def gerer_proposition_soumise(proposition_utilisateur):
     st.session_state.message_erreur = ""
     
     evaluation = evaluer_proposition_sutom(MOT_MYSTERE_FIXE, proposition_utilisateur)
-    
     st.session_state.historique_propositions.append(evaluation)
     
     if proposition_utilisateur == MOT_MYSTERE_FIXE:
         st.session_state.trouve = True
     
-    # Réinitialisation SÛRE du champ d'entrée
     if not st.session_state.trouve:
         st.session_state.input_prop = ""
 
-# --- Initialisation de l'application Streamlit ---
+# --- Interface Utilisateur Streamlit ---
 
 st.title("🤫 SUTOM Personnalisé : QUIETUDE")
 st.markdown(f"Trouvez le mot mystère de **{LONGUEUR_MOT} lettres** qui commence par **{PREMIERE_LETTRE}**.")
 st.markdown("> *🟢 Vert : Bonne lettre, bonne position. 🟡 Jaune : Bonne lettre, mauvaise position.*")
 
-# Initialisation des variables de session
-if 'historique_propositions' not in st.session_state:
-    st.session_state.historique_propositions = []
-if 'trouve' not in st.session_state:
-    st.session_state.trouve = False
-if 'message_erreur' not in st.session_state:
-    st.session_state.message_erreur = ""
+# --- Section Grille d'Historique ---
+st.header("Grille d'Historique")
 
-# --- Affichage de l'historique de la grille SUTOM ---
-st.header("Grille de Jeu")
-
+# 1. Afficher les tentatives précédentes
 if st.session_state.historique_propositions:
     for evaluation in st.session_state.historique_propositions:
         afficher_grille_sutom(evaluation)
-else:
-    # Afficher la première ligne avec la première lettre révélée (stylisée)
-    premiere_ligne = [(PREMIERE_LETTRE, "correct")] + [(" ", "case-sutom")] * (LONGUEUR_MOT - 1)
-    # L'affichage de la première ligne non encore jouée doit utiliser une classe "case-sutom" générique
+
+# 2. Afficher la ligne de départ (tant que le jeu n'est pas terminé et que le joueur n'a pas encore fait de tentative)
+if not st.session_state.trouve and not st.session_state.historique_propositions:
+    # Ligne de départ non jouée avec la première lettre en Vert
     html_content = ""
-    for lettre, classe in premiere_ligne:
-        # Si c'est la première lettre, on lui donne la classe "correct"
-        if lettre == PREMIERE_LETTRE:
-             html_content += f'<div class="case-sutom correct">{lettre}</div>'
-        # Sinon, c'est une case vide non colorée par défaut
-        else:
-             html_content += f'<div class="case-sutom"> </div>'
+    for i in range(LONGUEUR_MOT):
+        lettre = PREMIERE_LETTRE if i == 0 else " "
+        classe = "correct" if i == 0 else ""
+        html_content += f'<div class="case-sutom {classe}">{lettre}</div>'
     st.markdown(f'<div class="ligne-sutom">{html_content}</div>', unsafe_allow_html=True)
 
 
-# --- Formulaire de Jeu ---
+# --- Section Fin de Partie ---
+if st.session_state.trouve:
+    st.success(f"🎉 FÉLICITATIONS ! Le mot mystère était **{MOT_MYSTERE_FIXE}** ! Vous avez trouvé en {len(st.session_state.historique_propositions)} tentatives.")
+    st.balloons()
+    st.header("Partie Terminée")
+    
+# --- Section Formulaire de Jeu ---
 if not st.session_state.trouve:
     st.header("Faites une Proposition")
     
@@ -185,7 +193,6 @@ if not st.session_state.trouve:
         value=st.session_state.get('input_prop', '')
     ).strip().upper()
     
-    # Vérification et appel de la fonction de rappel
     st.button(
         "Soumettre",
         on_click=gerer_proposition_soumise,
@@ -196,16 +203,23 @@ if not st.session_state.trouve:
         st.error(st.session_state.message_erreur)
         st.session_state.message_erreur = ""
 
-# --- Fin de partie et Option de Réinitialisation ---
-if st.session_state.trouve:
-    st.success(f"🎉 FÉLICITATIONS ! Le mot mystère était **{MOT_MYSTERE_FIXE}** ! Vous avez trouvé en {len(st.session_state.historique_propositions)} tentatives.")
-    st.balloons()
+# --- Section Clavier Virtuel ---
+st.header("Clavier Virtuel")
+afficher_clavier()
 
-    st.header("Partie Terminée")
+# --- Option de Réinitialisation ---
+if st.session_state.trouve or st.button("Recommencer une nouvelle partie"):
     def reinitialiser_jeu():
         st.session_state.historique_propositions = []
         st.session_state.trouve = False
         st.session_state.input_prop = "" 
-
-    if st.button("Recommencer une nouvelle partie", on_click=reinitialiser_jeu):
+        st.session_state.etat_clavier = {chr(i): 'default' for i in range(ord('A'), ord('Z') + 1)}
+    
+    if st.session_state.trouve:
+        # Bouton de réinitialisation après victoire
+        if st.button("Recommencer", on_click=reinitialiser_jeu):
+            st.rerun()
+    elif "Recommencer" not in st.session_state:
+        # Si le bouton "Recommencer" générique a été cliqué
+        reinitialiser_jeu()
         st.rerun()
